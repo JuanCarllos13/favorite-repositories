@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from "react"
-import { Container, Owner, Loading, BackButton, IssuesList } from './styles'
-import {FaArrowLeft} from 'react-icons/fa'
+import { Container, Owner, Loading, BackButton, IssuesList, PageActions, FilterLIst } from './styles'
+import { FaArrowLeft } from 'react-icons/fa'
 import api from '../../services/api'
 
 function Repositorio({ match }) {
     const [repositorio, setRepositorio] = useState({})
     const [issues, setIssues] = useState([])
     const [loading, setLoading] = useState(true)
+    const [page, setPage] = useState(1)
+    const [filters, setFilters] = useState([
+        { state: 'all', label: 'Todas', active: true },
+        { state: 'open', label: 'abertas', active: false },
+        { state: 'closed', label: 'Fechados', active: false },
+    ])
+    const [filterIndex, setFilterIndex] = useState(0)
 
     useEffect(() => {
         async function load() {
@@ -18,7 +25,7 @@ function Repositorio({ match }) {
                 api.get(`/repos/${nomeRepo}`),
                 api.get(`/repos/${nomeRepo}/issues`, {
                     params: {
-                        state: 'open',
+                        state: filters.find(f => f.active).state, //all
                         per_page: 5
                     }
                 })
@@ -33,19 +40,48 @@ function Repositorio({ match }) {
     }, [match.params.repositorio])
 
 
-    if(loading){
-        return(
+    useEffect(() => {
+
+        async function loadIssues() {
+            const nomeRepo = decodeURIComponent(match.params.repositorio)
+
+            const response = await api.get(`repos/${nomeRepo}/issues`, {
+                params: {
+                    state: filters[filterIndex].state,
+                    page,
+                    per_page: 5
+                }
+            })
+            setIssues(response.data)
+        }
+        loadIssues()
+    }, [page, filterIndex, filters])
+
+    function handlePage(action) {
+        setPage(action === 'back' ? page - 1 : page + 1)
+    }
+
+
+    function handleFilter(index){
+        setFilterIndex(index)
+
+    }
+
+
+
+    if (loading) {
+        return (
             <Loading>
                 <h1> Carregando</h1>
             </Loading>
         )
-     
+
     }
 
     return (
         <Container>
             <BackButton to={'/'}>
-                <FaArrowLeft  color={'#000'} size={30}/>
+                <FaArrowLeft color={'#000'} size={30} />
 
             </BackButton>
             <Owner>
@@ -54,29 +90,47 @@ function Repositorio({ match }) {
                 <p> {repositorio.description} </p>
             </Owner>
 
-        <IssuesList>
-        {issues.map(issue => (
-            <li key={ String(issue.id)}>
-                <img src={issue.user.avatar_url} alt={issue.user.login} />
+            <FilterLIst active={filterIndex}>
+                {filters.map((filter, index) => (
+                    <button
+                        type="button"
+                        key={filter.label}
+                        onClick={() => handleFilter(index)}
+                    >
+                        {filter.label}
 
-                <div>
-                    <strong>
-                        <a href={issue.html_url}> {issue.title} </a>
+                    </button>
+                ))}
 
-                        {issue.labels.map(label => (
-                            <span key={String(label.id)}>
-                                {label.name}
-                            </span>
-                        ))}
-                    </strong>
+            </FilterLIst>
+
+            <IssuesList>
+                {issues.map(issue => (
+                    <li key={String(issue.id)}>
+                        <img src={issue.user.avatar_url} alt={issue.user.login} />
+
+                        <div>
+                            <strong>
+                                <a href={issue.html_url}> {issue.title} </a>
+
+                                {issue.labels.map(label => (
+                                    <span key={String(label.id)}>
+                                        {label.name}
+                                    </span>
+                                ))}
+                            </strong>
                             <p> {issue.user.login} </p>
 
-                </div>
+                        </div>
 
-            </li>
-        ))}
-        </IssuesList>
+                    </li>
+                ))}
+            </IssuesList>
 
+            <PageActions>
+                <button type="button" onClick={() => handlePage('back')} disabled={page < 2} >Voltar</button>
+                <button type="button" onClick={() => handlePage('next')} >Próxima</button>
+            </PageActions>
 
 
         </Container>
